@@ -66,8 +66,11 @@ if authentication_status:
         st.sidebar.markdown("""
         [Twitter Dev](https://developer.twitter.com/en/docs/basics/twitter-ids) is a website that provides a list of Twitter API endpoints.
         """)
+        st.sidebar.markdown("""
+        [Twitter Advance Search](https://github.com/igorbrigadir/twitter-advanced-search) Readme file for twitter advanced search query filters.
+        """)
 
-        search_terms = st.selectbox("Search Terms", ['user', 'hashtag', 'trends','tweets','mentions'])
+        search_terms = st.selectbox("Search Terms", ['user','download posts','trends'])
         # tweet_count = st.number_input("Number of Tweets", min_value=1, max_value=100, value=10)
         
         if search_terms=='user':
@@ -78,23 +81,24 @@ if authentication_status:
                 userdata = dict(json.loads(userScraper._get_entity().json()))
                 
                                     #can apply customisation to almost all the properties of the card, including the progress bar
-                theme_bad = {'bgcolor': '#FFF0F0','title_color': 'red','content_color': 'red','icon_color': 'red', 'icon': 'fa fa-times-circle'}
+                theme_bad = {'bgcolor': '#FFF0F0','title_text_align':'center','title_color': 'red','content_color': 'red','icon_color': 'red', 'icon': 'fa fa-times-circle'}
                 theme_neutral = {'bgcolor': '#f9f9f9','title_color': 'orange','content_color': 'orange','icon_color': 'orange', 'icon': 'fa fa-question-circle'}
                 theme_good = {'bgcolor': '#EFF8F7','title_color': 'green','content_color': 'green','icon_color': 'green', 'icon': 'fa fa-check-circle'}
                 
-                # 'followersCount': 58567,
-                # 'friendsCount': 20,
-                # 'statusesCount': 33755,
-                # 'favouritesCount': 1955,
-                # 'listedCount': 103,
-                # 'mediaCount': 537
-
+                st.markdown(f"""<div style="background-color:#377ed4;padding:25px;border-radius:10px;"><p>Username:{userdata['username']} </p>
+                            <p>Display Name: {userdata['displayname']}</p>
+                            <p>Description : {userdata['description']}</p>
+                            <p>Created Date: {userdata['created']} </p>
+                            </div>""",unsafe_allow_html=True)
+                st.write(f"""Twitter Page: [Twitter Link]({userdata['url']})""")
+                
+                
                 cc = st.columns(3)
                 with cc[0]:
                 # can just use 'good', 'bad', 'neutral' sentiment to auto color the card
                     hc.info_card(title='Follower Count', content=userdata['followersCount'], sentiment='good',bar_value=77,)
                     hc.info_card(title='Listed', content=userdata['listedCount'],bar_value=12,sentiment='good')#theme_override=theme_good)
-
+                    
                 with cc[1]:
                     hc.info_card(title='Following', content=userdata['friendsCount'],bar_value=12,theme_override=theme_bad)
                     hc.info_card(title='Favourites Count', content=userdata['favouritesCount'], sentiment='bad',bar_value=77,)
@@ -109,20 +113,47 @@ if authentication_status:
                 #     hc.info_card(title='Some NEUTRAL',content='Maybe...',key='sec',bar_value=5,theme_override=theme_neutral)
                 # st.write(user_data)
             except:
-                st.error("User not found")
-        elif search_terms=='hashtag':
-            hashtag = st.text_input("Hashtag")
-            hashtag_data = sntwitter.get_hashtag_data(hashtag, tweet_count)
-            st.subheader("Hashtag Data")
-            st.write(hashtag_data)
+                st.error("Details not found")
+        elif search_terms=='download posts':
+            with st.form("Query tweets"):
+                col1,col2=st.columns(2)
+                query_type=col1.selectbox('Select query type',options=['User Posts','Hastag','quote'])
+                query = col2.text_input("Input query")
+
+                col1,col2,col3=st.columns(3)
+                max_tweets=col1.number_input("Input maximum number of tweets",min_value=1,max_value=500,value=10)
+                min_date=col2.date_input("Input Start Date")
+                max_date=col3.date_input("Input End Date")
+                #st.write(min_date,max_date)
+                submitted=st.form_submit_button("Submit")
+            if submitted:
+                try:
+                    func_map={'User Posts':sntwitter.TwitterUserScraper,
+                            'Hastag':sntwitter.TwitterHashtagScraper,
+                            'quote':sntwitter.TwitterSearchScraper}
+                    tweet_list=[]
+                    
+                    connect=func_map[query_type](query)#+"since:2020-06-01 until:2020-07-31")
+                    for i,tweet in enumerate(connect.get_items()):
+                        if i>=max_tweets:
+                            break
+                        tweet_list.append([tweet.id,tweet.date,tweet.user.username,tweet.content,tweet.likeCount])
+                        
+                    tweet_df=pd.DataFrame(tweet_list,columns=['id','timestamp','user','tweet','likes'])
+                    st.dataframe(tweet_df)
+                except:
+                    st.error("Details not found")
+        
         elif search_terms=='trends':
-            trends_data = sntwitter.get_trends_data()
+            trends = sntwitter.TwitterTrendsScraper()
+            trend_list=[]
+            for i,tweet in enumerate(trends.get_items()):
+                trend_list.append([tweet.name,tweet.domainContext,tweet.metaDescription])
+                        
+            tweet_df=pd.DataFrame(trend_list,columns=['Trend','Context','Popularity'])
             st.subheader("Trends Data")
-            st.write(trends_data)
-        elif search_terms=='tweets':
-            tweets_data = sntwitter.get_tweets_data(tweet_count)
-            st.subheader("Tweets Data")
-            st.write(tweets_data)
+            st.table(tweet_df)
+        
 
 
     elif site=="Facebook":
